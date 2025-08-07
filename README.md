@@ -394,17 +394,32 @@ fi_pingpong -e rdm -I 1 -W 5
 
 ## Examples
 
-### Basic Training Cluster
+### AWS Examples
+
+#### Basic Training Cluster
 See `examples/basic/` for a simple 8-node training cluster.
 
-### Advanced Auto Scaling
+#### Advanced Auto Scaling
 See `examples/advanced/` for auto-scaling configuration.
 
-### Multi-Region Setup
+#### Multi-Region Setup
 See `examples/multi-region/` for cross-region deployment.
 
-### Terragrunt Integration
+#### Terragrunt Integration
 See `examples/terragrunt/` for Terragrunt configuration with remote state management.
+
+### Azure Examples
+
+#### Basic HPC Cluster
+See `examples/azure-basic/` for a simple 8-node HPC cluster with InfiniBand and Azure NetApp Files.
+
+#### Advanced Auto-Scaling
+See `examples/azure-advanced/` for production HPC cluster with auto-scaling and comprehensive monitoring.
+
+#### Terragrunt Integration
+See `examples/azure-terragrunt/` for Azure HPC deployment with remote state management.
+
+For detailed information about Azure examples, see `examples/azure-README.md`.
 
 ## Testing
 
