@@ -156,7 +156,7 @@ module "hpc_networking" {
 }
 ```
 
-## 📖 Input Variables
+## Input Variables
 
 ### Required Variables
 
@@ -213,7 +213,7 @@ module "hpc_networking" {
 | enable_cloudwatch | Enable CloudWatch | bool | true |
 | cloudwatch_retention_days | Log retention (days) | number | 30 |
 
-## 📤 Outputs
+## Outputs
 
 ### Network Information
 - `efa_network_interfaces`: EFA network interface details
@@ -243,7 +243,7 @@ module "hpc_networking" {
 - `network_tuning_parameters`: Network tuning settings
 - `performance_benchmarks`: Expected performance benchmarks
 
-## 🔧 Performance Optimization
+## Performance Optimization
 
 ### EFA Environment Variables
 
@@ -279,7 +279,7 @@ Automatic network optimization includes:
 - Progressive file layout
 - GPUDirect Storage support
 
-## 💰 Cost Optimization
+## Cost Optimization
 
 ### VPC Endpoints
 
@@ -308,7 +308,7 @@ max_size = 16
 desired_capacity = 8
 ```
 
-## 🔍 Monitoring & Alerting
+## Monitoring & Alerting
 
 ### CloudWatch Metrics
 
