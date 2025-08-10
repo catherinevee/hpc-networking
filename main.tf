@@ -148,11 +148,11 @@ resource "aws_autoscaling_policy" "hpc_cpu" {
   }
 }
 
-# EFA Network Interfaces for individual instances (when not using ASG)
+# EFA Network Interfaces for individual instances (when not using ASG) - CONVERTED TO FOR_EACH
 resource "aws_network_interface" "efa" {
-  count = var.enable_auto_scaling ? 0 : var.instance_count
+  for_each = var.enable_auto_scaling ? {} : toset(range(var.instance_count))
 
-  subnet_id         = aws_subnet.private_compute[count.index % length(aws_subnet.private_compute)].id
+  subnet_id         = aws_subnet.private_compute[each.value % length(aws_subnet.private_compute)].id
   security_groups   = [aws_security_group.efa.id]
   source_dest_check = false
 
@@ -164,14 +164,14 @@ resource "aws_network_interface" "efa" {
   }
 
   tags = merge(local.common_tags, {
-    Name = "${var.project_name}-efa-interface-${count.index + 1}"
-    InstanceIndex = count.index + 1
+    Name = "${var.project_name}-efa-interface-${each.value + 1}"
+    InstanceIndex = each.value + 1
   })
 }
 
-# EC2 Instances (when not using Auto Scaling)
+# EC2 Instances (when not using Auto Scaling) - CONVERTED TO FOR_EACH
 resource "aws_instance" "hpc" {
-  count = var.enable_auto_scaling ? 0 : var.instance_count
+  for_each = var.enable_auto_scaling ? {} : toset(range(var.instance_count))
 
   ami           = data.aws_ami.ubuntu_gpu.id
   instance_type = var.instance_type
@@ -179,7 +179,7 @@ resource "aws_instance" "hpc" {
   key_name = var.key_name
 
   network_interface {
-    network_interface_id = aws_network_interface.efa[count.index].id
+    network_interface_id = aws_network_interface.efa[each.key].id
     device_index         = 0
   }
 
@@ -202,8 +202,8 @@ resource "aws_instance" "hpc" {
   monitoring = true
 
   tags = merge(local.common_tags, {
-    Name = "${var.project_name}-hpc-instance-${count.index + 1}"
-    InstanceIndex = count.index + 1
+    Name = "${var.project_name}-hpc-instance-${each.value + 1}"
+    InstanceIndex = each.value + 1
   })
 
   lifecycle {
@@ -214,7 +214,7 @@ resource "aws_instance" "hpc" {
   depends_on = [aws_network_interface.efa]
 }
 
-# FSx for Lustre File System
+# FSx for Lustre File System - ADDING RESOURCE PROTECTION
 resource "aws_fsx_lustre_file_system" "hpc" {
   count = var.enable_fsx_lustre ? 1 : 0
 
@@ -232,6 +232,7 @@ resource "aws_fsx_lustre_file_system" "hpc" {
 
   lifecycle {
     create_before_destroy = true
+    prevent_destroy       = true  # ADDED RESOURCE PROTECTION
   }
 }
 
@@ -259,7 +260,7 @@ resource "aws_fsx_data_repository_association" "hpc" {
   })
 }
 
-# S3 Bucket for Data Repository
+# S3 Bucket for Data Repository - ADDING RESOURCE PROTECTION
 resource "aws_s3_bucket" "data_repository" {
   count = var.enable_fsx_lustre ? 1 : 0
 
@@ -268,6 +269,10 @@ resource "aws_s3_bucket" "data_repository" {
   tags = merge(local.common_tags, {
     Name = "${var.project_name}-data-repository"
   })
+
+  lifecycle {
+    prevent_destroy = true  # ADDED RESOURCE PROTECTION
+  }
 }
 
 # S3 Bucket Versioning
@@ -367,7 +372,7 @@ resource "null_resource" "performance_optimization" {
   }
 }
 
-# Error Handling and Validation
+# Error Handling and Validation - ENHANCED VALIDATION
 resource "null_resource" "validation" {
   provisioner "local-exec" {
     command = <<-EOT
@@ -376,6 +381,10 @@ resource "null_resource" "validation" {
       # Check if instance type supports EFA
       if [ "${var.enable_efa}" = "true" ]; then
         echo "✓ EFA is enabled"
+        if [[ ! "p5.48xlarge p5.24xlarge p5.12xlarge p4d.24xlarge p4de.24xlarge g5.48xlarge g5.24xlarge g5.12xlarge c6i.32xlarge c6i.24xlarge c6i.16xlarge" =~ "${var.instance_type}" ]]; then
+          echo "ERROR: Instance type ${var.instance_type} may not support EFA"
+          exit 1
+        fi
         echo "✓ Instance type ${var.instance_type} supports EFA"
       fi
       
@@ -383,14 +392,29 @@ resource "null_resource" "validation" {
       echo "✓ Placement strategy: ${var.placement_strategy}"
       
       # Check subnet configuration
+      if [[ ${length(local.private_compute_subnets)} -lt 2 ]]; then
+        echo "ERROR: At least 2 compute subnets required for high availability"
+        exit 1
+      fi
       echo "✓ Compute subnets: ${length(local.private_compute_subnets)}"
       echo "✓ Storage subnets: ${length(local.private_storage_subnets)}"
       
       # Check FSx configuration
       if [ "${var.enable_fsx_lustre}" = "true" ]; then
         echo "✓ FSx for Lustre is enabled"
+        if [[ ${var.fsx_storage_capacity} -lt 1200 || ${var.fsx_storage_capacity} -gt 100000 ]]; then
+          echo "ERROR: FSx storage capacity must be between 1.2TB and 100TB"
+          exit 1
+        fi
         echo "✓ Storage capacity: ${var.fsx_storage_capacity} GB"
       fi
+      
+      # Check environment configuration
+      if [[ ! "dev staging prod" =~ "${var.environment}" ]]; then
+        echo "ERROR: Environment must be dev, staging, or prod"
+        exit 1
+      fi
+      echo "✓ Environment: ${var.environment}"
       
       echo "Configuration validation complete!"
     EOT
@@ -401,5 +425,7 @@ resource "null_resource" "validation" {
     enable_efa = var.enable_efa
     enable_fsx_lustre = var.enable_fsx_lustre
     placement_strategy = var.placement_strategy
+    environment = var.environment
+    fsx_storage_capacity = var.fsx_storage_capacity
   }
 } 

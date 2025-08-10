@@ -16,6 +16,11 @@ variable "project_name" {
   description = "Project name for resource tagging"
   type        = string
   default     = "hpc-networking"
+  
+  validation {
+    condition = can(regex("^[a-z0-9-]+$", var.project_name))
+    error_message = "Project name must contain only lowercase letters, numbers, and hyphens."
+  }
 }
 
 variable "region" {
@@ -35,6 +40,11 @@ variable "region" {
 variable "vpc_id" {
   description = "Existing VPC ID"
   type        = string
+  
+  validation {
+    condition = can(regex("^vpc-[a-z0-9]+$", var.vpc_id))
+    error_message = "VPC ID must be a valid VPC identifier."
+  }
 }
 
 variable "vpc_cidr" {
@@ -118,6 +128,19 @@ variable "subnet_configuration" {
     private_storage_subnets = ["10.0.20.0/24", "10.0.21.0/24"]
     private_endpoint_subnets = ["10.0.30.0/24", "10.0.31.0/24"]
   }
+  
+  validation {
+    condition = alltrue([
+      for cidr in var.subnet_configuration.public_subnets : can(cidrhost(cidr, 0))
+    ]) && alltrue([
+      for cidr in var.subnet_configuration.private_compute_subnets : can(cidrhost(cidr, 0))
+    ]) && alltrue([
+      for cidr in var.subnet_configuration.private_storage_subnets : can(cidrhost(cidr, 0))
+    ]) && alltrue([
+      for cidr in var.subnet_configuration.private_endpoint_subnets : can(cidrhost(cidr, 0))
+    ])
+    error_message = "All subnet CIDR blocks must be valid."
+  }
 }
 
 # Storage Configuration
@@ -160,6 +183,13 @@ variable "allowed_cidr_blocks" {
   description = "CIDR blocks allowed to access the cluster"
   type        = list(string)
   default     = ["10.0.0.0/16"]
+  
+  validation {
+    condition = alltrue([
+      for cidr in var.allowed_cidr_blocks : can(cidrhost(cidr, 0))
+    ])
+    error_message = "All allowed CIDR blocks must be valid."
+  }
 }
 
 variable "enable_encryption" {
@@ -228,6 +258,15 @@ variable "tags" {
   description = "Additional tags for resources"
   type        = map(string)
   default     = {}
+  
+  validation {
+    condition = alltrue([
+      for key, value in var.tags : 
+        can(regex("^[a-zA-Z0-9_.-]+$", key)) && 
+        length(value) <= 256
+    ])
+    error_message = "Tag keys must be alphanumeric with dots, underscores, or hyphens. Tag values must be 256 characters or less."
+  }
 }
 
 # Advanced Configuration
@@ -235,18 +274,30 @@ variable "user_data_script" {
   description = "Custom user data script for instance initialization"
   type        = string
   default     = ""
+  sensitive   = true
 }
 
 variable "iam_instance_profile" {
   description = "IAM instance profile for EC2 instances"
   type        = string
   default     = ""
+  
+  validation {
+    condition = var.iam_instance_profile == "" || can(regex("^[a-zA-Z0-9+=,.@_-]+$", var.iam_instance_profile))
+    error_message = "IAM instance profile name must be valid."
+  }
 }
 
 variable "key_name" {
   description = "SSH key pair name for instance access"
   type        = string
   default     = ""
+  sensitive   = true
+  
+  validation {
+    condition = var.key_name == "" || can(regex("^[a-zA-Z0-9+=,.@_-]+$", var.key_name))
+    error_message = "SSH key name must be valid."
+  }
 }
 
 # Scaling Configuration

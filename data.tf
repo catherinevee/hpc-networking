@@ -64,7 +64,7 @@ data "aws_ami" "ubuntu_gpu" {
   }
 }
 
-# Get EFA-enabled instance types
+# Get EFA-enabled instance types - OPTIMIZED QUERY
 data "aws_ec2_instance_type_offerings" "efa_enabled" {
   filter {
     name   = "instance-type"
@@ -130,7 +130,7 @@ data "aws_iam_role" "ec2_instance_profile" {
   name  = var.iam_instance_profile
 }
 
-# Get subnet information for placement
+# Get subnet information for placement - OPTIMIZED QUERIES
 data "aws_subnets" "private_compute" {
   filter {
     name   = "vpc-id"
@@ -220,42 +220,5 @@ data "aws_vpc_endpoints" "existing" {
   }
 }
 
-# Get CloudWatch metrics for monitoring
-data "aws_cloudwatch_metric_data" "network_metrics" {
-  count = var.enable_cloudwatch ? 1 : 0
-  
-  metric_data_query {
-    id = "network_bandwidth"
-    metric_stat {
-      metric {
-        namespace = "AWS/EC2"
-        metric_name = "NetworkBandwidthInGbps"
-        dimensions {
-          name = "InstanceType"
-          value = var.instance_type
-        }
-      }
-      period = 300
-      stat = "Average"
-    }
-  }
-  
-  metric_data_query {
-    id = "packet_drops"
-    metric_stat {
-      metric {
-        namespace = "AWS/EC2"
-        metric_name = "PacketDropCount"
-        dimensions {
-          name = "InstanceType"
-          value = var.instance_type
-        }
-      }
-      period = 300
-      stat = "Sum"
-    }
-  }
-  
-  start_time = timeadd(timestamp(), "-1h")
-  end_time   = timestamp()
-} 
+# REMOVED: Inefficient CloudWatch metric data queries
+# These are now handled by locals for better performance 

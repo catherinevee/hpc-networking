@@ -7,13 +7,22 @@ resource "aws_security_group" "efa" {
   description = "Security group for EFA-enabled instances"
   vpc_id      = var.vpc_id
 
-  # All traffic within security group for EFA
+  # EFA-specific ports only (replacing overly permissive rule)
   ingress {
-    from_port = 0
-    to_port   = 0
-    protocol  = "-1"
-    self      = true
-    description = "All traffic within EFA security group"
+    from_port   = 18515
+    to_port     = 18516
+    protocol    = "tcp"
+    self        = true
+    description = "EFA communication ports"
+  }
+
+  # NCCL ports for distributed training
+  ingress {
+    from_port   = 29500
+    to_port     = 29599
+    protocol    = "tcp"
+    self        = true
+    description = "NCCL communication ports"
   }
 
   # SSH access from allowed CIDR blocks
@@ -26,32 +35,6 @@ resource "aws_security_group" "efa" {
       cidr_blocks = [ingress.value]
       description = "SSH access from ${ingress.value}"
     }
-  }
-
-  # EFA-specific ports
-  ingress {
-    from_port   = 18515
-    to_port     = 18515
-    protocol    = "tcp"
-    self        = true
-    description = "EFA communication port"
-  }
-
-  ingress {
-    from_port   = 18516
-    to_port     = 18516
-    protocol    = "tcp"
-    self        = true
-    description = "EFA communication port"
-  }
-
-  # NCCL ports for distributed training
-  ingress {
-    from_port   = 29500
-    to_port     = 29599
-    protocol    = "tcp"
-    self        = true
-    description = "NCCL communication ports"
   }
 
   # All outbound traffic
@@ -175,7 +158,7 @@ resource "aws_iam_role" "ec2_role" {
   })
 }
 
-# IAM Policy for EC2 instances
+# IAM Policy for EC2 instances - IMPLEMENTING LEAST PRIVILEGE
 resource "aws_iam_role_policy" "ec2_policy" {
   name = "${var.project_name}-ec2-policy"
   role = aws_iam_role.ec2_role.id
@@ -187,24 +170,47 @@ resource "aws_iam_role_policy" "ec2_policy" {
         Effect = "Allow"
         Action = [
           "ec2:DescribeInstances",
-          "ec2:DescribeTags",
-          "ec2:DescribeVolumes",
-          "ec2:DescribeNetworkInterfaces"
+          "ec2:DescribeTags"
         ]
-        Resource = "*"
+        Resource = [
+          "arn:aws:ec2:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:instance/*",
+          "arn:aws:ec2:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:volume/*"
+        ]
+        Condition = {
+          StringEquals = {
+            "aws:RequestTag/Project" = var.project_name
+          }
+        }
       },
       {
         Effect = "Allow"
         Action = [
           "s3:GetObject",
           "s3:PutObject",
-          "s3:DeleteObject",
+          "s3:DeleteObject"
+        ]
+        Resource = [
+          "arn:aws:s3:::${var.project_name}-data-repository/*"
+        ]
+        Condition = {
+          StringEquals = {
+            "aws:RequestTag/Project" = var.project_name
+          }
+        }
+      },
+      {
+        Effect = "Allow"
+        Action = [
           "s3:ListBucket"
         ]
         Resource = [
-          "arn:aws:s3:::${var.project_name}-*",
-          "arn:aws:s3:::${var.project_name}-*/*"
+          "arn:aws:s3:::${var.project_name}-data-repository"
         ]
+        Condition = {
+          StringEquals = {
+            "aws:RequestTag/Project" = var.project_name
+          }
+        }
       },
       {
         Effect = "Allow"
@@ -214,26 +220,40 @@ resource "aws_iam_role_policy" "ec2_policy" {
           "logs:PutLogEvents",
           "logs:DescribeLogStreams"
         ]
-        Resource = "arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/aws/hpc-networking/*"
+        Resource = "arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/aws/hpc-networking/${var.project_name}*"
       },
       {
         Effect = "Allow"
         Action = [
-          "cloudwatch:PutMetricData",
-          "cloudwatch:GetMetricData",
-          "cloudwatch:ListMetrics"
+          "cloudwatch:PutMetricData"
+        ]
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "cloudwatch:namespace" = "AWS/EC2"
+          }
+        }
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ecr:GetAuthorizationToken"
         ]
         Resource = "*"
       },
       {
         Effect = "Allow"
         Action = [
-          "ecr:GetAuthorizationToken",
           "ecr:BatchCheckLayerAvailability",
           "ecr:GetDownloadUrlForLayer",
           "ecr:BatchGetImage"
         ]
-        Resource = "*"
+        Resource = "arn:aws:ecr:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:repository/*"
+        Condition = {
+          StringEquals = {
+            "aws:RequestTag/Project" = var.project_name
+          }
+        }
       }
     ]
   })
@@ -273,7 +293,7 @@ resource "aws_iam_role" "cloudwatch_role" {
   })
 }
 
-# IAM Policy for CloudWatch monitoring
+# IAM Policy for CloudWatch monitoring - IMPLEMENTING LEAST PRIVILEGE
 resource "aws_iam_role_policy" "cloudwatch_policy" {
   count = var.enable_cloudwatch ? 1 : 0
 
@@ -288,12 +308,14 @@ resource "aws_iam_role_policy" "cloudwatch_policy" {
         Action = [
           "cloudwatch:PutMetricData",
           "cloudwatch:GetMetricData",
-          "cloudwatch:ListMetrics",
-          "cloudwatch:DescribeAlarms",
-          "cloudwatch:PutMetricAlarm",
-          "cloudwatch:DeleteAlarms"
+          "cloudwatch:ListMetrics"
         ]
         Resource = "*"
+        Condition = {
+          StringEquals = {
+            "cloudwatch:namespace" = ["AWS/EC2", "AWS/FSx"]
+          }
+        }
       },
       {
         Effect = "Allow"
@@ -303,13 +325,13 @@ resource "aws_iam_role_policy" "cloudwatch_policy" {
           "logs:PutLogEvents",
           "logs:DescribeLogStreams"
         ]
-        Resource = "arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/aws/hpc-networking/*"
+        Resource = "arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/aws/hpc-networking/${var.project_name}*"
       }
     ]
   })
 }
 
-# KMS Key for encryption (if enabled)
+# KMS Key for encryption (if enabled) - ADDING RESOURCE PROTECTION
 resource "aws_kms_key" "hpc_encryption" {
   count = var.enable_encryption ? 1 : 0
 
@@ -345,7 +367,24 @@ resource "aws_kms_key" "hpc_encryption" {
         Resource = "*"
         Condition = {
           ArnEquals = {
-            "kms:EncryptionContext:aws:logs:arn" = "arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/aws/hpc-networking/*"
+            "kms:EncryptionContext:aws:logs:arn" = "arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/aws/hpc-networking/${var.project_name}*"
+          }
+        }
+      },
+      {
+        Sid    = "Allow EC2 instances to use the key"
+        Effect = "Allow"
+        Principal = {
+          AWS = aws_iam_role.ec2_role.arn
+        }
+        Action = [
+          "kms:Decrypt",
+          "kms:GenerateDataKey"
+        ]
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "aws:RequestTag/Project" = var.project_name
           }
         }
       }
@@ -355,6 +394,10 @@ resource "aws_kms_key" "hpc_encryption" {
   tags = merge(local.common_tags, {
     Name = "${var.project_name}-encryption-key"
   })
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 # KMS Key Alias

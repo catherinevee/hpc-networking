@@ -57,20 +57,10 @@ output "placement_group" {
   } : null
 }
 
-# Network Performance Metrics
+# Network Performance Metrics - UPDATED TO USE CONSOLIDATED METRICS
 output "network_performance_metrics" {
   description = "Expected network performance metrics"
-  value = {
-    expected_bandwidth_gbps = local.bandwidth_by_instance[var.instance_type]
-    efa_version = local.efa_generation[var.instance_type]
-    placement_group_id = var.enable_efa ? aws_placement_group.efa[0].id : null
-    expected_latency_us = local.latency_by_placement[var.placement_strategy]
-    gpu_count = local.gpu_count_by_instance[var.instance_type]
-    mtu_size = local.mtu_size
-    jumbo_frames_enabled = var.enable_jumbo_frames
-    sriov_enabled = var.enable_sriov
-    numa_optimization_enabled = var.numa_optimization
-  }
+  value = local.performance_metrics
 }
 
 # Subnet Information
@@ -273,15 +263,15 @@ output "connection_info" {
   }
 }
 
-# Performance Benchmarks
+# Performance Benchmarks - UPDATED TO USE CONSOLIDATED METRICS
 output "performance_benchmarks" {
   description = "Expected performance benchmarks"
   value = {
-    expected_bandwidth_gbps = local.bandwidth_by_instance[var.instance_type]
-    expected_latency_us = local.latency_by_placement[var.placement_strategy]
+    expected_bandwidth_gbps = local.performance_metrics.expected_bandwidth_gbps
+    expected_latency_us = local.performance_metrics.expected_latency_us
     fsx_throughput_mibps = var.enable_fsx_lustre ? (var.fsx_storage_capacity / 1024) * 1000 : null
-    efa_generation = local.efa_generation[var.instance_type]
-    gpu_interconnect_bandwidth = local.gpu_count_by_instance[var.instance_type] > 0 ? "NVSwitch" : "N/A"
+    efa_generation = local.performance_metrics.efa_version
+    gpu_interconnect_bandwidth = local.performance_metrics.gpu_count > 0 ? "NVSwitch" : "N/A"
   }
 }
 

@@ -2,6 +2,20 @@
 # Computed values and performance specifications
 
 locals {
+  # Consistent naming convention
+  name_prefix = "${var.project_name}-${var.environment}"
+  
+  # Resource naming convention
+  resource_names = {
+    placement_group = "${local.name_prefix}-efa-pg"
+    security_group  = "${local.name_prefix}-efa-sg"
+    launch_template = "${local.name_prefix}-hpc-lt"
+    auto_scaling_group = "${local.name_prefix}-hpc-asg"
+    fsx_file_system = "${local.name_prefix}-fsx-lustre"
+    s3_bucket = "${var.project_name}-data-repository"
+    kms_key = "${local.name_prefix}-encryption"
+  }
+
   # Common tags for all resources
   common_tags = merge({
     Environment         = var.environment
@@ -181,8 +195,8 @@ locals {
     "net.core.netdev_budget_usecs" = "8000"
   }
 
-  # CloudWatch alarms configuration
-  network_alarms = {
+  # CloudWatch alarms configuration - CONSOLIDATED FOR PERFORMANCE
+  network_alarms = var.enable_cloudwatch ? {
     high_packet_loss = {
       metric_name = "PacketDropCount"
       threshold   = 1000
@@ -211,7 +225,7 @@ locals {
       evaluation_periods = 3
       comparison_operator = "GreaterThanThreshold"
     }
-  }
+  } : {}
 
   # User data script for EFA and performance optimization
   efa_user_data = base64encode(templatefile("${path.module}/templates/user_data.sh.tpl", {
@@ -234,7 +248,7 @@ locals {
     subnet_ids = aws_subnet.private_storage[*].id
     security_group_ids = [aws_security_group.fsx.id]
     tags = merge(local.common_tags, {
-      Name = "${var.project_name}-fsx-lustre"
+      Name = local.resource_names.fsx_file_system
       StorageType = "HighPerformance"
     })
   } : null
@@ -253,4 +267,16 @@ locals {
       scale_out_cooldown = 300
     }
   } : null
+
+  # Performance metrics - CONSOLIDATED FOR BETTER PERFORMANCE
+  performance_metrics = {
+    expected_bandwidth_gbps = local.bandwidth_by_instance[var.instance_type]
+    efa_version = local.efa_generation[var.instance_type]
+    expected_latency_us = local.latency_by_placement[var.placement_strategy]
+    gpu_count = local.gpu_count_by_instance[var.instance_type]
+    mtu_size = local.mtu_size
+    jumbo_frames_enabled = var.enable_jumbo_frames
+    sriov_enabled = var.enable_sriov
+    numa_optimization_enabled = var.numa_optimization
+  }
 } 
