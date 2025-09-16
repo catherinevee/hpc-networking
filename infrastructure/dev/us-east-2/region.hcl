@@ -3,6 +3,11 @@
 locals {
   environment = "dev"
   region = "us-east-2"
+  account_id  = "025066254478"  # Hardcoded for validation phase
+  
+  # Dev-specific configurations
+  cluster_capacity = 100
+  budget_limit = 50000  # $50,000 per month for dev
   
   # Cluster naming convention
   cluster_name = "hpc-${local.environment}"
@@ -300,5 +305,33 @@ locals {
     Project = "HPC-Networking"
     ManagedBy = "Terragrunt"
     Owner = "DevOps-Team"
+  }
+  
+  # Dev-specific storage configuration
+  storage_config = {
+    fsx_scratch_size = 50    # 50TB instead of 500TB
+    fsx_persistent_size = 10 # 10TB instead of 100TB
+    s3_intelligent_tiering = false  # Disable for cost savings
+  }
+  
+  # Dev-specific monitoring configuration
+  monitoring_config = {
+    log_retention_days = 7    # Shorter retention
+    detailed_monitoring = false  # Disable detailed monitoring
+    enable_grafana = false    # Disable Grafana for dev
+  }
+  
+  # Dev-specific security configuration
+  security_config = {
+    enable_guardduty = false  # Disable for cost savings
+    enable_inspector = false
+    enable_config = false
+  }
+  
+  # Dev-specific cost optimization
+  cost_optimization = {
+    spot_percentage = 90      # Higher spot usage
+    enable_savings_plans = false
+    enable_reserved_instances = false
   }
 }
