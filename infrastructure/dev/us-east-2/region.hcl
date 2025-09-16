@@ -12,10 +12,20 @@ locals {
   
   # Instance type mappings for different workloads
   instance_types = {
-    compute = "c5n.9xlarge"
-    memory  = "r5n.12xlarge"
-    gpu     = "p3.8xlarge"
-    debug   = "c5n.large"
+    compute = {
+      hpc_optimized = "hpc6a.48xlarge"  # 96 vCPUs, 384 GiB RAM, 100 Gbps EFA
+      memory_optimized = "x2iezn.32xlarge"  # 128 vCPUs, 4 TiB RAM
+      gpu_instances = "p4d.24xlarge"  # 8x A100 GPUs
+      general_purpose = "m6i.32xlarge"  # 128 vCPUs, 512 GiB RAM
+    }
+    spot_types = [
+      "hpc6a.48xlarge",
+      "c5n.18xlarge",
+      "c5n.24xlarge",
+      "c5n.9xlarge",
+      "m5n.24xlarge",
+      "m5dn.24xlarge"
+    ]
   }
   
   # Queue configurations for Slurm
