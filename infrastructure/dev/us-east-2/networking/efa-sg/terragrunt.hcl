@@ -23,9 +23,9 @@ dependency "vpc" {
 inputs = {
   cluster_name = "hpc-${local.environment}"
   vpc_id       = dependency.vpc.outputs.vpc_id
-  vpc_cidr     = local.vpc_config.cidr_block
+  vpc_cidr     = local.networking.vpc_cidr
   subnet_id    = dependency.vpc.outputs.compute_subnets[0]
-  availability_zone = local.subnet_config.compute.availability_zones[0]
+  availability_zone = local.networking.primary_az
   
   # EFA Configuration
   efa_device = "efa0"
@@ -33,7 +33,7 @@ inputs = {
   enable_gpudirect = false  # Disabled for dev
   
   # Instance Configuration
-  instance_type = local.instance_types.compute.hpc_optimized
+  instance_type = local.instance_types.compute
   ami_id        = data.aws_ami.hpc_optimized.id
   
   # EFA-specific settings
@@ -58,10 +58,10 @@ inputs = {
   cpu_credits = "standard"
   
   # S3 Configuration
-  s3_bucket_name = local.s3_config.data_repository.bucket_name
+  s3_bucket_name = local.storage.s3.data_repository_bucket
   
   # Monitoring Configuration
-  log_retention_days = local.cloudwatch_config.log_groups.hpc_system_logs.retention_in_days
+  log_retention_days = local.monitoring.cloudwatch.log_retention_days
   kms_key_id = aws_kms_key.hpc.arn
   
   # Alarm Configuration
@@ -69,13 +69,18 @@ inputs = {
   ok_actions    = [aws_sns_topic.hpc_alerts.arn]
   
   # Tags
-  tags = merge(local.common_tags, {
+  tags = {
     Component = "EFA-Network"
     Tier      = "HPC-Compute"
-  })
+    Environment = local.environment
+    Region = local.region
+  }
   
   # Additional variables for local Terraform resources
   environment = local.environment
   region      = local.region
-  common_tags = local.common_tags
+  common_tags = {
+    Environment = local.environment
+    Region = local.region
+  }
 }
