@@ -33,12 +33,8 @@ inputs = {
   enable_nat_gateway = true
   single_nat_gateway = true  # Cost optimization for dev
   
-  # Enable VPC Flow Logs
-  enable_flow_log = true
-  create_flow_log_cloudwatch_log_group = true
-  create_flow_log_cloudwatch_iam_role  = true
-  flow_log_max_aggregation_interval    = 60
-  flow_log_cloudwatch_log_group_name_suffix = "vpc-flow-logs"
+  # Disable VPC Flow Logs for now to simplify configuration
+  enable_flow_log = false
   
   # VPC Endpoints for AWS services
   enable_s3_endpoint = true
