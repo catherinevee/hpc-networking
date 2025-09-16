@@ -16,20 +16,21 @@ terraform {
 }
 
 inputs = {
+  # VPC Module inputs
   name = "hpc-${local.environment}-vpc"
-  cidr = local.networking.vpc_cidr
+  cidr = local.vpc_config.cidr_block
   
-  azs             = local.availability_zones
-  private_subnets = local.networking.subnet_cidrs.private
-  public_subnets  = local.networking.subnet_cidrs.public
+  azs             = local.subnet_config.private.availability_zones
+  private_subnets = local.subnet_config.private.cidr_blocks
+  public_subnets  = local.subnet_config.public.cidr_blocks
   
   # Additional subnets for HPC
-  database_subnets = local.networking.subnet_cidrs.storage
-  compute_subnets  = local.networking.subnet_cidrs.compute
+  database_subnets = local.subnet_config.storage.cidr_blocks
+  compute_subnets  = local.subnet_config.compute.cidr_blocks
   
   # Enable DNS
-  enable_dns_hostnames = true
-  enable_dns_support   = true
+  enable_dns_hostnames = local.vpc_config.enable_dns_hostnames
+  enable_dns_support   = local.vpc_config.enable_dns_support
   
   # Enable NAT Gateway (single for dev)
   enable_nat_gateway = true
@@ -43,46 +44,6 @@ inputs = {
   
   # VPC Endpoints for AWS services
   enable_s3_endpoint = true
-  
-  # Additional VPC endpoints for HPC services
-  vpc_endpoint_config = {
-    ec2 = {
-      service = "ec2"
-      vpc_endpoint_type = "Interface"
-      subnet_ids = local.networking.subnet_cidrs.private
-      security_group_ids = [aws_security_group.vpc_endpoints.id]
-    }
-    ec2messages = {
-      service = "ec2messages"
-      vpc_endpoint_type = "Interface"
-      subnet_ids = local.networking.subnet_cidrs.private
-      security_group_ids = [aws_security_group.vpc_endpoints.id]
-    }
-    ssm = {
-      service = "ssm"
-      vpc_endpoint_type = "Interface"
-      subnet_ids = local.networking.subnet_cidrs.private
-      security_group_ids = [aws_security_group.vpc_endpoints.id]
-    }
-    ssmmessages = {
-      service = "ssmmessages"
-      vpc_endpoint_type = "Interface"
-      subnet_ids = local.networking.subnet_cidrs.private
-      security_group_ids = [aws_security_group.vpc_endpoints.id]
-    }
-    cloudwatch = {
-      service = "cloudwatch"
-      vpc_endpoint_type = "Interface"
-      subnet_ids = local.networking.subnet_cidrs.private
-      security_group_ids = [aws_security_group.vpc_endpoints.id]
-    }
-    cloudwatchlogs = {
-      service = "logs"
-      vpc_endpoint_type = "Interface"
-      subnet_ids = local.networking.subnet_cidrs.private
-      security_group_ids = [aws_security_group.vpc_endpoints.id]
-    }
-  }
   
   # Tags
   tags = merge(local.common_tags, {
@@ -110,36 +71,11 @@ inputs = {
     Type = "Compute-Subnet"
     Tier = "HPC-Compute"
   })
+  
+  # Additional variables for local Terraform resources
+  environment = local.environment
+  region      = local.region
+  vpc_cidr    = local.vpc_config.cidr_block
+  common_tags = local.common_tags
 }
 
-# Security Group for VPC Endpoints
-resource "aws_security_group" "vpc_endpoints" {
-  name_prefix = "hpc-${local.environment}-vpc-endpoints-"
-  vpc_id      = module.vpc.vpc_id
-  description = "Security group for VPC endpoints"
-  
-  ingress {
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = [local.networking.vpc_cidr]
-    description = "HTTPS from VPC"
-  }
-  
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "All outbound traffic"
-  }
-  
-  tags = merge(local.common_tags, {
-    Name = "hpc-${local.environment}-vpc-endpoints-sg"
-    Type = "VPC-Endpoints-SecurityGroup"
-  })
-  
-  lifecycle {
-    create_before_destroy = true
-  }
-}
