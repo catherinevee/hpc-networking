@@ -1,4 +1,8 @@
 # FSx Lustre Persistent Storage for Dev Environment
+include "env" {
+  path = "../../../env.hcl"
+}
+
 include "region" {
   path = "../../region.hcl"
 }

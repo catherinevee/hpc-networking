@@ -1,7 +1,4 @@
 # US East 2 Region Configuration for Dev Environment
-include "env" {
-  path = "../env.hcl"
-}
 
 locals {
   region = "us-east-2"
