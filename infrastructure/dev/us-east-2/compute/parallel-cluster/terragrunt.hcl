@@ -1,15 +1,5 @@
 # AWS ParallelCluster Configuration for Dev Environment
-include "account" {
-  path = find_in_parent_folders("account.hcl")
-}
-
-include "env" {
-  path = "../../../env.hcl"
-}
-
-include "region" {
-  path = "../../region.hcl"
-}
+# Simplified configuration with hardcoded values to avoid locals loading issues
 
 terraform {
   source = "git::https://github.com/aws-ia/terraform-aws-parallelcluster.git?ref=v3.7.0"
@@ -37,8 +27,8 @@ dependency "fsx_persistent" {
 }
 
 inputs = {
-  # Cluster Configuration
-  cluster_name = local.cluster_name
+  # Cluster Configuration - Hardcoded for dev environment
+  cluster_name = "hpc-dev"
   
   # VPC Configuration
   vpc_id = "vpc-placeholder"  # Will be replaced when VPC is applied
@@ -66,36 +56,47 @@ inputs = {
   # Head Node Configuration
   head_node = {
     instance_type = "c5n.2xlarge"
-    ami_id = data.aws_ami.hpc_optimized.id
+    ami_id = "ami-placeholder"  # Will be resolved by data source
     root_volume = {
       size = 50
       volume_type = "gp3"
     }
   }
   
-  # Compute Nodes Configuration
+  # Compute Nodes Configuration - Hardcoded for dev environment
   compute_nodes = {
-    instance_types = local.slurm_queues.compute.instance_types
-    min_count = local.slurm_queues.compute.min_count
-    max_count = local.slurm_queues.compute.max_count
-    spot_percentage = local.slurm_queues.compute.spot_percentage
+    instance_types = ["c5n.9xlarge", "c5n.18xlarge"]
+    min_count = 0
+    max_count = 500
+    spot_percentage = 70
   }
   
-  # EFA Configuration
+  # EFA Configuration - Hardcoded for dev environment
   efa = {
-    enabled = local.efa_config.enabled
-    gdr_support = local.efa_config.enable_gpudirect
+    enabled = true
+    gdr_support = false
   }
   
-  # Tags
-  tags = merge(local.common_tags, {
-    Name = local.cluster_name
+  # Tags - Hardcoded for dev environment
+  tags = {
+    Environment = "dev"
+    Region = "us-east-2"
+    Project = "HPC-Networking"
+    ManagedBy = "Terragrunt"
+    Owner = "DevOps-Team"
+    Name = "hpc-dev"
     Type = "ParallelCluster"
     Purpose = "HPC-Compute"
-  })
+  }
   
   # Additional variables for local Terraform resources
-  environment = local.environment
-  region      = local.region
-  common_tags = local.common_tags
+  environment = "dev"
+  region      = "us-east-2"
+  common_tags = {
+    Environment = "dev"
+    Region = "us-east-2"
+    Project = "HPC-Networking"
+    ManagedBy = "Terragrunt"
+    Owner = "DevOps-Team"
+  }
 }

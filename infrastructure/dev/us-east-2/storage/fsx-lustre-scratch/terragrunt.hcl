@@ -1,15 +1,5 @@
 # FSx Lustre Scratch Storage for Dev Environment
-include "account" {
-  path = find_in_parent_folders("account.hcl")
-}
-
-include "env" {
-  path = "../../../env.hcl"
-}
-
-include "region" {
-  path = "../../region.hcl"
-}
+# Simplified configuration with hardcoded values to avoid locals loading issues
 
 terraform {
   source = "git::https://github.com/terraform-aws-modules/terraform-aws-fsx-lustre.git?ref=v1.0.0"
@@ -27,36 +17,43 @@ dependency "s3_bucket" {
 }
 
 inputs = {
-  # FSx Lustre Configuration
-  name = "hpc-${local.environment}-scratch"
+  # FSx Lustre Configuration - Hardcoded for dev environment
+  name = "hpc-dev-scratch"
   
-  # Storage Configuration
-  storage_capacity = local.fsx_lustre_config.scratch.storage_capacity
-  storage_type     = local.fsx_lustre_config.scratch.storage_type
-  deployment_type  = local.fsx_lustre_config.scratch.deployment_type
-  per_unit_storage_throughput = local.fsx_lustre_config.scratch.per_unit_storage_throughput
+  # Storage Configuration - Hardcoded for dev environment
+  storage_capacity = 50  # 50TB for dev
+  storage_type     = "SSD"
+  deployment_type  = "PERSISTENT_1"
+  per_unit_storage_throughput = 200  # MB/s per TiB
   
   # Data compression
-  data_compression_type = local.fsx_lustre_config.scratch.data_compression_type
+  data_compression_type = "LZ4"
   
   # Auto import policy
-  auto_import_policy = local.fsx_lustre_config.scratch.auto_import_policy
+  auto_import_policy = "NEW_CHANGED_DELETED"
   
-  # Backup Configuration
-  automatic_backup_retention_days = local.fsx_lustre_config.scratch.automatic_backup_retention_days
-  daily_automatic_backup_start_time = local.fsx_lustre_config.scratch.daily_automatic_backup_start_time
-  weekly_maintenance_start_time = local.fsx_lustre_config.scratch.weekly_maintenance_start_time
+  # Backup Configuration - Hardcoded for dev environment
+  automatic_backup_retention_days = 7
+  daily_automatic_backup_start_time = "03:00"
+  weekly_maintenance_start_time = "sun:04:00"
   
   # Network Configuration
   subnet_ids         = ["subnet-placeholder"]  # Will be replaced when VPC is applied
   security_group_ids = ["sg-placeholder"]  # Will be replaced when VPC is applied
 
   # S3 Data Repository
-  data_repository_path = "s3://hpc-dev-data-repository/scratch"  # Will be replaced when S3 is applied
+  data_repository_path = "s3://hpc-dev-us-east-2-data-repository/scratch"  # Will be replaced when S3 is applied
   
-  # Tags
-  tags = merge(local.common_tags, local.fsx_lustre_config.scratch.tags, {
-    Name = "hpc-${local.environment}-scratch"
+  # Tags - Hardcoded for dev environment
+  tags = {
+    Environment = "dev"
+    Region = "us-east-2"
+    Project = "HPC-Networking"
+    ManagedBy = "Terragrunt"
+    Owner = "DevOps-Team"
+    Purpose = "Scratch-Storage"
+    DataLifecycle = "Temporary"
+    Name = "hpc-dev-scratch"
     Type = "FSx-Lustre"
-  })
+  }
 }

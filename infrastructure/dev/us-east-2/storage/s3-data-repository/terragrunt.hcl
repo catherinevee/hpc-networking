@@ -1,15 +1,5 @@
 # S3 Data Repository for Dev Environment
-include "account" {
-  path = find_in_parent_folders("account.hcl")
-}
-
-include "env" {
-  path = "../../../env.hcl"
-}
-
-include "region" {
-  path = "../../region.hcl"
-}
+# Simplified configuration with hardcoded values to avoid locals loading issues
 
 terraform {
   source = "git::https://github.com/terraform-aws-modules/terraform-aws-s3-bucket.git?ref=v4.1.2"
@@ -22,33 +12,56 @@ dependency "kms" {
 }
 
 inputs = {
-  # Bucket Configuration
-  bucket = local.s3_config.data_repository.bucket_name
+  # Bucket Configuration - Hardcoded for dev environment
+  bucket = "hpc-dev-us-east-2-data-repository"
   
   # Versioning
   versioning = {
-    enabled = local.s3_config.data_repository.versioning_enabled
+    enabled = true
   }
   
   # Encryption
   server_side_encryption_configuration = {
     rule = {
       apply_server_side_encryption_by_default = {
-        sse_algorithm = local.s3_config.data_repository.encryption_algorithm
+        sse_algorithm = "AES256"
       }
     }
   }
   
-  # Lifecycle rules
-  lifecycle_rule = local.s3_config.data_repository.lifecycle_rules
+  # Lifecycle rules - Hardcoded for dev environment
+  lifecycle_rule = [
+    {
+      id = "archive-old-versions"
+      enabled = true
+      noncurrent_version_transitions = [
+        {
+          days          = 30
+          storage_class = "STANDARD_IA"
+        },
+        {
+          days          = 60
+          storage_class = "GLACIER"
+        },
+      ]
+      noncurrent_version_expiration = {
+        days = 365
+      }
+    }
+  ]
   
-  # Intelligent tiering
-  intelligent_tiering = local.s3_config.data_repository.intelligent_tiering
+  # Intelligent tiering - Disabled for dev
+  intelligent_tiering = false
   
-  # Tags
-  tags = merge(local.common_tags, {
-    Name = "hpc-${local.environment}-data-repository"
+  # Tags - Hardcoded for dev environment
+  tags = {
+    Environment = "dev"
+    Region = "us-east-2"
+    Project = "HPC-Networking"
+    ManagedBy = "Terragrunt"
+    Owner = "DevOps-Team"
+    Name = "hpc-dev-data-repository"
     Type = "S3-Bucket"
     Purpose = "Data-Repository"
-  })
+  }
 }
