@@ -1,0 +1,351 @@
+# AWS ParallelCluster Configuration for Production Environment
+Region: us-east-2
+Image:
+  Os: alinux2
+  CustomAmi: ami-0c02fb55956c7d316  # Amazon Linux 2 HVM
+
+HeadNode:
+  InstanceType: c5n.8xlarge
+  Ssh:
+    KeyName: hpc-production-keypair
+  Networking:
+    SubnetId: subnet-0123456789abcdef0
+    SecurityGroups:
+      - sg-0123456789abcdef0
+  Iam:
+    S3Access:
+      - BucketName: hpc-data-repository-production-*
+        EnableWriteAccess: true
+    AdditionalIamPolicies:
+      - Policy: arn:aws:iam::aws:policy/AmazonS3FullAccess
+  Storage:
+    RootVolume:
+      Size: 500
+      VolumeType: gp3
+      Iops: 3000
+      Throughput: 125
+      Encrypted: true
+    MountDir: /shared
+    SharedStorage:
+      - Name: scratch
+        StorageType: FsxLustre
+        MountDir: /scratch
+        FsxLustreSettings:
+          FileSystemId: fs-0123456789abcdef0
+          MountName: scratch
+      - Name: persistent
+        StorageType: FsxLustre
+        MountDir: /shared
+        FsxLustreSettings:
+          FileSystemId: fs-0123456789abcdef1
+          MountName: persistent
+      - Name: home
+        StorageType: Efs
+        MountDir: /home
+        EfsSettings:
+          FileSystemId: fs-0123456789abcdef2
+          Encrypted: true
+
+Scheduling:
+  Scheduler: slurm
+  SlurmSettings:
+    ScaledownIdletime: 10
+    QueueUpdateStrategy: DRAIN
+    EnableMemoryBasedScheduling: true
+    EnableGpuSharing: true
+    GpuSharingStrategy: CUDA_MPS
+    SlurmDctldParameters:
+      - "AccountingStorageEnforce=associations,limits,qos"
+      - "AccountingStorageType=accounting_storage/slurmdbd"
+      - "AccountingStoreJobComment=YES"
+      - "JobCompType=jobcomp/filetxt"
+      - "JobCompLoc=/var/log/slurm/jobcomp.log"
+      - "SlurmctldParameters=enable_configless"
+      - "SlurmdParameters=enable_configless"
+    SlurmctldParameters:
+      - "enable_configless"
+    SlurmdParameters:
+      - "enable_configless"
+    CustomSlurmConfig: |
+      # Custom Slurm configuration for HPC
+      JobCheckpointDir=/shared/checkpoints
+      PrologSlurmctld=/opt/parallelcluster/scripts/prolog_slurmctld.sh
+      EpilogSlurmctld=/opt/parallelcluster/scripts/epilog_slurmctld.sh
+      PrologSlurmctld=/opt/parallelcluster/scripts/prolog_slurmd.sh
+      EpilogSlurmctld=/opt/parallelcluster/scripts/epilog_slurmd.sh
+      
+      # EFA configuration
+      SlurmdParameters=enable_configless,efa
+      
+      # Memory configuration
+      DefMemPerNode=128000
+      MaxMemPerNode=512000
+      
+      # GPU configuration
+      GresTypes=gpu
+      NodeName=compute-gpu Gres=gpu:1
+      
+      # Fair-share scheduling
+      PriorityType=priority/multifactor
+      PriorityDecayHalfLife=7-0
+      PriorityFavorSmall=NO
+      PriorityMaxAge=7-0
+      PriorityUsageResetPeriod=7-0
+      PriorityWeightAge=1000
+      PriorityWeightAssoc=1000
+      PriorityWeightFairshare=1000
+      PriorityWeightJobSize=1000
+      PriorityWeightPartition=1000
+      PriorityWeightQOS=1000
+      
+      # Job limits
+      MaxJobCount=5000
+      MaxArraySize=5000
+      MaxJobSubmit=5000
+      
+      # Time limits
+      MaxTime=7-00:00:00
+      MinTime=00:01:00
+      
+      # Node configuration
+      NodeName=compute-cpu State=UNKNOWN
+      NodeName=compute-memory State=UNKNOWN
+      NodeName=compute-gpu State=UNKNOWN
+      NodeName=debug State=UNKNOWN
+
+  SlurmQueues:
+    - Name: compute
+      ComputeResources:
+        - Name: hpc6a-48xlarge
+          InstanceType: hpc6a.48xlarge
+          MinCount: 0
+          MaxCount: 500
+          SpotPrice: 2.0
+          Efa:
+            Enabled: true
+          Networking:
+            SubnetIds:
+              - subnet-0123456789abcdef0
+            SecurityGroups:
+              - sg-0123456789abcdef0
+          Iam:
+            S3Access:
+              - BucketName: hpc-data-repository-production-*
+                EnableWriteAccess: true
+            AdditionalIamPolicies:
+              - Policy: arn:aws:iam::aws:policy/AmazonS3FullAccess
+          Storage:
+            RootVolume:
+              Size: 500
+              VolumeType: gp3
+              Iops: 3000
+              Throughput: 125
+              Encrypted: true
+            MountDir: /shared
+            SharedStorage:
+              - Name: scratch
+                StorageType: FsxLustre
+                MountDir: /scratch
+                FsxLustreSettings:
+                  FileSystemId: fs-0123456789abcdef0
+                  MountName: scratch
+              - Name: persistent
+                StorageType: FsxLustre
+                MountDir: /shared
+                FsxLustreSettings:
+                  FileSystemId: fs-0123456789abcdef1
+                  MountName: persistent
+              - Name: home
+                StorageType: Efs
+                MountDir: /home
+                EfsSettings:
+                  FileSystemId: fs-0123456789abcdef2
+                  Encrypted: true
+          CustomSlurmConfig: |
+            # Compute queue configuration
+            NodeName=compute-cpu State=UNKNOWN
+            PartitionName=compute Nodes=compute-cpu Default=YES MaxTime=7-00:00:00
+            DefMemPerNode=128000
+            MaxMemPerNode=512000
+            
+    - Name: memory
+      ComputeResources:
+        - Name: x2iezn-32xlarge
+          InstanceType: x2iezn.32xlarge
+          MinCount: 0
+          MaxCount: 100
+          SpotPrice: 4.0
+          Efa:
+            Enabled: true
+          Networking:
+            SubnetIds:
+              - subnet-0123456789abcdef0
+            SecurityGroups:
+              - sg-0123456789abcdef0
+          Iam:
+            S3Access:
+              - BucketName: hpc-data-repository-production-*
+                EnableWriteAccess: true
+            AdditionalIamPolicies:
+              - Policy: arn:aws:iam::aws:policy/AmazonS3FullAccess
+          Storage:
+            RootVolume:
+              Size: 500
+              VolumeType: gp3
+              Iops: 3000
+              Throughput: 125
+              Encrypted: true
+            MountDir: /shared
+            SharedStorage:
+              - Name: scratch
+                StorageType: FsxLustre
+                MountDir: /scratch
+                FsxLustreSettings:
+                  FileSystemId: fs-0123456789abcdef0
+                  MountName: scratch
+              - Name: persistent
+                StorageType: FsxLustre
+                MountDir: /shared
+                FsxLustreSettings:
+                  FileSystemId: fs-0123456789abcdef1
+                  MountName: persistent
+              - Name: home
+                StorageType: Efs
+                MountDir: /home
+                EfsSettings:
+                  FileSystemId: fs-0123456789abcdef2
+                  Encrypted: true
+          CustomSlurmConfig: |
+            # Memory queue configuration
+            NodeName=compute-memory State=UNKNOWN
+            PartitionName=memory Nodes=compute-memory MaxTime=7-00:00:00
+            DefMemPerNode=512000
+            MaxMemPerNode=2048000
+            
+    - Name: gpu
+      ComputeResources:
+        - Name: p4d-24xlarge
+          InstanceType: p4d.24xlarge
+          MinCount: 0
+          MaxCount: 50
+          SpotPrice: 8.0
+          Efa:
+            Enabled: true
+          Networking:
+            SubnetIds:
+              - subnet-0123456789abcdef0
+            SecurityGroups:
+              - sg-0123456789abcdef0
+          Iam:
+            S3Access:
+              - BucketName: hpc-data-repository-production-*
+                EnableWriteAccess: true
+            AdditionalIamPolicies:
+              - Policy: arn:aws:iam::aws:policy/AmazonS3FullAccess
+          Storage:
+            RootVolume:
+              Size: 500
+              VolumeType: gp3
+              Iops: 3000
+              Throughput: 125
+              Encrypted: true
+            MountDir: /shared
+            SharedStorage:
+              - Name: scratch
+                StorageType: FsxLustre
+                MountDir: /scratch
+                FsxLustreSettings:
+                  FileSystemId: fs-0123456789abcdef0
+                  MountName: scratch
+              - Name: persistent
+                StorageType: FsxLustre
+                MountDir: /shared
+                FsxLustreSettings:
+                  FileSystemId: fs-0123456789abcdef1
+                  MountName: persistent
+              - Name: home
+                StorageType: Efs
+                MountDir: /home
+                EfsSettings:
+                  FileSystemId: fs-0123456789abcdef2
+                  Encrypted: true
+          CustomSlurmConfig: |
+            # GPU queue configuration
+            NodeName=compute-gpu State=UNKNOWN
+            PartitionName=gpu Nodes=compute-gpu MaxTime=7-00:00:00
+            GresTypes=gpu
+            NodeName=compute-gpu Gres=gpu:1
+            DefMemPerNode=128000
+            MaxMemPerNode=512000
+            
+    - Name: debug
+      ComputeResources:
+        - Name: c5n-4xlarge
+          InstanceType: c5n.4xlarge
+          MinCount: 2
+          MaxCount: 10
+          SpotPrice: 0
+          Efa:
+            Enabled: true
+          Networking:
+            SubnetIds:
+              - subnet-0123456789abcdef0
+            SecurityGroups:
+              - sg-0123456789abcdef0
+          Iam:
+            S3Access:
+              - BucketName: hpc-data-repository-production-*
+                EnableWriteAccess: true
+            AdditionalIamPolicies:
+              - Policy: arn:aws:iam::aws:policy/AmazonS3FullAccess
+          Storage:
+            RootVolume:
+              Size: 500
+              VolumeType: gp3
+              Iops: 3000
+              Throughput: 125
+              Encrypted: true
+            MountDir: /shared
+            SharedStorage:
+              - Name: scratch
+                StorageType: FsxLustre
+                MountDir: /scratch
+                FsxLustreSettings:
+                  FileSystemId: fs-0123456789abcdef0
+                  MountName: scratch
+              - Name: persistent
+                StorageType: FsxLustre
+                MountDir: /shared
+                FsxLustreSettings:
+                  FileSystemId: fs-0123456789abcdef1
+                  MountName: persistent
+              - Name: home
+                StorageType: Efs
+                MountDir: /home
+                EfsSettings:
+                  FileSystemId: fs-0123456789abcdef2
+                  Encrypted: true
+          CustomSlurmConfig: |
+            # Debug queue configuration
+            NodeName=debug State=UNKNOWN
+            PartitionName=debug Nodes=debug MaxTime=1-00:00:00
+            DefMemPerNode=32000
+            MaxMemPerNode=64000
+
+Monitoring:
+  Logs:
+    CloudWatch:
+      Enabled: true
+      LogGroupName: /aws/parallelcluster/hpc-production
+      RetentionInDays: 90
+  Dashboards:
+    CloudWatch:
+      Enabled: true
+      DashboardName: HPC-Production-Dashboard
+
+Tags:
+  Environment: production
+  Project: HPC-Networking
+  Owner: HPC-Team
+  CostCenter: HPC-Production
+  ManagedBy: Terragrunt

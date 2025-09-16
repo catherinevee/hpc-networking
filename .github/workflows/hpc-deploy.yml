@@ -1,0 +1,389 @@
+name: HPC Infrastructure Deployment
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'infrastructure/**'
+      - 'cluster-configs/**'
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'infrastructure/**'
+      - 'cluster-configs/**'
+  schedule:
+    - cron: '0 2 * * *'  # Daily validation at 2 AM UTC
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: choice
+        options: [dev, staging, production]
+        default: dev
+        description: 'Target environment'
+      action:
+        type: choice
+        options: [plan, apply, destroy, scale-up, scale-down]
+        default: plan
+        description: 'Action to perform'
+      cluster_size:
+        type: string
+        description: 'Target cluster size (for scaling actions)'
+        default: '50'
+      region:
+        type: choice
+        options: [us-east-2, eu-west-1, ap-northeast-1]
+        default: us-east-2
+        description: 'Target region'
+
+env:
+  TF_VERSION: '1.5.7'
+  TG_VERSION: '0.50.17'
+  PCLUSTER_VERSION: '3.7.0'
+  AWS_REGION: 'us-east-2'
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  # Validate configuration
+  validate:
+    name: Validate Configuration
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.set-env.outputs.environment }}
+      region: ${{ steps.set-env.outputs.region }}
+      action: ${{ steps.set-env.outputs.action }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set environment variables
+        id: set-env
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
+            echo "region=${{ github.event.inputs.region }}" >> $GITHUB_OUTPUT
+            echo "action=${{ github.event.inputs.action }}" >> $GITHUB_OUTPUT
+          else
+            echo "environment=dev" >> $GITHUB_OUTPUT
+            echo "region=us-east-2" >> $GITHUB_OUTPUT
+            echo "action=plan" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Setup Terragrunt
+        run: |
+          wget -O terragrunt https://github.com/gruntwork-io/terragrunt/releases/download/v${{ env.TG_VERSION }}/terragrunt_linux_amd64
+          chmod +x terragrunt
+          sudo mv terragrunt /usr/local/bin/
+
+      - name: Validate Terragrunt configuration
+        run: |
+          cd infrastructure/${{ steps.set-env.outputs.environment }}/${{ steps.set-env.outputs.region }}
+          terragrunt run-all validate
+
+  # Validate network configuration
+  validate-network:
+    name: Validate Network Configuration
+    runs-on: ubuntu-latest
+    needs: validate
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Setup Terragrunt
+        run: |
+          wget -O terragrunt https://github.com/gruntwork-io/terragrunt/releases/download/v${{ env.TG_VERSION }}/terragrunt_linux_amd64
+          chmod +x terragrunt
+          sudo mv terragrunt /usr/local/bin/
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ needs.validate.outputs.region }}
+          role-session-name: GitHubActions-HPC-Network-Validation
+
+      - name: Validate network configuration
+        run: |
+          cd infrastructure/${{ needs.validate.outputs.environment }}/${{ needs.validate.outputs.region }}/networking
+          
+          # Check EFA compatibility
+          echo "Checking EFA instance types..."
+          terragrunt run-all plan -target=module.efa_sg
+          
+          # Validate placement groups
+          echo "Validating placement groups..."
+          terragrunt run-all plan -target=module.placement_groups
+          
+          # Verify security groups
+          echo "Verifying security groups..."
+          terragrunt run-all plan -target=module.security_groups
+          
+          # Test VPC endpoints
+          echo "Testing VPC endpoints..."
+          terragrunt run-all plan -target=module.vpc_endpoints
+
+  # Validate storage configuration
+  validate-storage:
+    name: Validate Storage Configuration
+    runs-on: ubuntu-latest
+    needs: validate
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Setup Terragrunt
+        run: |
+          wget -O terragrunt https://github.com/gruntwork-io/terragrunt/releases/download/v${{ env.TG_VERSION }}/terragrunt_linux_amd64
+          chmod +x terragrunt
+          sudo mv terragrunt /usr/local/bin/
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ needs.validate.outputs.region }}
+          role-session-name: GitHubActions-HPC-Storage-Validation
+
+      - name: Validate storage configuration
+        run: |
+          cd infrastructure/${{ needs.validate.outputs.environment }}/${{ needs.validate.outputs.region }}/storage
+          
+          # Check FSx configuration
+          echo "Checking FSx Lustre configuration..."
+          terragrunt run-all plan -target=module.fsx_lustre
+          
+          # Validate S3 buckets
+          echo "Validating S3 buckets..."
+          terragrunt run-all plan -target=module.s3_buckets
+          
+          # Test DataSync tasks
+          echo "Testing DataSync tasks..."
+          terragrunt run-all plan -target=module.datasync
+
+  # Deploy infrastructure
+  deploy-infrastructure:
+    name: Deploy Infrastructure
+    runs-on: ubuntu-latest
+    needs: [validate, validate-network, validate-storage]
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    strategy:
+      matrix:
+        component: [networking, storage, compute, monitoring]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Setup Terragrunt
+        run: |
+          wget -O terragrunt https://github.com/gruntwork-io/terragrunt/releases/download/v${{ env.TG_VERSION }}/terragrunt_linux_amd64
+          chmod +x terragrunt
+          sudo mv terragrunt /usr/local/bin/
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ needs.validate.outputs.region }}
+          role-session-name: GitHubActions-HPC-Infrastructure-Deploy
+
+      - name: Deploy ${{ matrix.component }}
+        run: |
+          cd infrastructure/${{ needs.validate.outputs.environment }}/${{ needs.validate.outputs.region }}/${{ matrix.component }}
+          
+          if [ "${{ needs.validate.outputs.action }}" = "destroy" ]; then
+            terragrunt run-all destroy --auto-approve
+          else
+            terragrunt run-all init
+            terragrunt run-all plan -out=tfplan
+            if [ "${{ needs.validate.outputs.action }}" = "apply" ]; then
+              terragrunt run-all apply tfplan
+            fi
+          fi
+
+  # Deploy cluster
+  deploy-cluster:
+    name: Deploy ParallelCluster
+    runs-on: ubuntu-latest
+    needs: [deploy-infrastructure]
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup AWS ParallelCluster
+        run: |
+          pip install aws-parallelcluster==${{ env.PCLUSTER_VERSION }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ needs.validate.outputs.region }}
+          role-session-name: GitHubActions-HPC-Cluster-Deploy
+
+      - name: Deploy ParallelCluster
+        run: |
+          if [ "${{ needs.validate.outputs.action }}" = "destroy" ]; then
+            pcluster delete-cluster --cluster-name hpc-${{ needs.validate.outputs.environment }} --region ${{ needs.validate.outputs.region }} --yes
+          else
+            pcluster create-cluster \
+              --cluster-name hpc-${{ needs.validate.outputs.environment }} \
+              --cluster-configuration cluster-configs/${{ needs.validate.outputs.environment }}.yaml \
+              --region ${{ needs.validate.outputs.region }}
+          fi
+
+  # Test cluster
+  test-cluster:
+    name: Test HPC Cluster
+    runs-on: ubuntu-latest
+    needs: [deploy-cluster]
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup AWS ParallelCluster
+        run: |
+          pip install aws-parallelcluster==${{ env.PCLUSTER_VERSION }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ needs.validate.outputs.region }}
+          role-session-name: GitHubActions-HPC-Testing
+
+      - name: Run HPC Tests
+        run: |
+          # Test MPI communication
+          echo "Testing MPI communication..."
+          pcluster ssh --cluster-name hpc-${{ needs.validate.outputs.environment }} --region ${{ needs.validate.outputs.region }} \
+            -c "mpirun -np 2 --hostfile /opt/parallelcluster/shared/compute_ready_nodes hostname"
+          
+          # Verify EFA functionality
+          echo "Verifying EFA functionality..."
+          pcluster ssh --cluster-name hpc-${{ needs.validate.outputs.environment }} --region ${{ needs.validate.outputs.region }} \
+            -c "fi_info -p efa"
+          
+          # Test storage performance
+          echo "Testing storage performance..."
+          pcluster ssh --cluster-name hpc-${{ needs.validate.outputs.environment }} --region ${{ needs.validate.outputs.region }} \
+            -c "dd if=/dev/zero of=/scratch/testfile bs=1M count=1000 && rm /scratch/testfile"
+          
+          # Validate job submission
+          echo "Validating job submission..."
+          pcluster ssh --cluster-name hpc-${{ needs.validate.outputs.environment }} --region ${{ needs.validate.outputs.region }} \
+            -c "sbatch --wrap='sleep 10' --job-name=test-job"
+
+  # Benchmark network performance
+  benchmark-network:
+    name: Network Performance Tests
+    runs-on: ubuntu-latest
+    needs: [test-cluster]
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup AWS ParallelCluster
+        run: |
+          pip install aws-parallelcluster==${{ env.PCLUSTER_VERSION }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ needs.validate.outputs.region }}
+          role-session-name: GitHubActions-HPC-Benchmarking
+
+      - name: Network Performance Tests
+        run: |
+          # OSU Micro-Benchmarks
+          echo "Running OSU Micro-Benchmarks..."
+          pcluster ssh --cluster-name hpc-${{ needs.validate.outputs.environment }} --region ${{ needs.validate.outputs.region }} \
+            -c "mpirun -np 2 --hostfile /opt/parallelcluster/shared/compute_ready_nodes /opt/amazon/efa/bin/osu_latency"
+          
+          # Intel MPI Benchmarks
+          echo "Running Intel MPI Benchmarks..."
+          pcluster ssh --cluster-name hpc-${{ needs.validate.outputs.environment }} --region ${{ needs.validate.outputs.region }} \
+            -c "mpirun -np 2 --hostfile /opt/parallelcluster/shared/compute_ready_nodes /opt/amazon/efa/bin/imb_pingpong"
+          
+          # EFA diagnostics
+          echo "Running EFA diagnostics..."
+          pcluster ssh --cluster-name hpc-${{ needs.validate.outputs.environment }} --region ${{ needs.validate.outputs.region }} \
+            -c "fi_info -p efa -v"
+          
+          # Bandwidth testing
+          echo "Testing bandwidth..."
+          pcluster ssh --cluster-name hpc-${{ needs.validate.outputs.environment }} --region ${{ needs.validate.outputs.region }} \
+            -c "mpirun -np 2 --hostfile /opt/parallelcluster/shared/compute_ready_nodes /opt/amazon/efa/bin/osu_bandwidth"
+
+  # Cost analysis
+  cost-analysis:
+    name: Cost Analysis
+    runs-on: ubuntu-latest
+    needs: [deploy-cluster]
+    if: always() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ needs.validate.outputs.region }}
+          role-session-name: GitHubActions-HPC-Cost-Analysis
+
+      - name: Cost Analysis
+        run: |
+          # Get current costs
+          echo "Current monthly costs:"
+          aws ce get-cost-and-usage \
+            --time-period Start=2024-01-01,End=2024-02-01 \
+            --granularity MONTHLY \
+            --metrics BlendedCost \
+            --query 'ResultsByTime[0].Total.BlendedCost.Amount' \
+            --output text
+          
+          # Get instance costs
+          echo "Instance costs:"
+          aws ce get-cost-and-usage \
+            --time-period Start=2024-01-01,End=2024-02-01 \
+            --granularity MONTHLY \
+            --metrics BlendedCost \
+            --group-by Type=DIMENSION,Key=SERVICE \
+            --query 'ResultsByTime[0].Groups[?Keys[0]==`Amazon Elastic Compute Cloud - Compute`].Metrics.BlendedCost.Amount' \
+            --output text
+          
+          # Get storage costs
+          echo "Storage costs:"
+          aws ce get-cost-and-usage \
+            --time-period Start=2024-01-01,End=2024-02-01 \
+            --granularity MONTHLY \
+            --metrics BlendedCost \
+            --group-by Type=DIMENSION,Key=SERVICE \
+            --query 'ResultsByTime[0].Groups[?Keys[0]==`Amazon Elastic File System`].Metrics.BlendedCost.Amount' \
+            --output text
