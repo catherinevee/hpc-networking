@@ -22,47 +22,32 @@ dependency "kms" {
 
 inputs = {
   # Bucket Configuration
-  bucket = local.storage.s3.data_repository_bucket
+  bucket = local.s3_config.data_repository.bucket_name
   
   # Versioning
   versioning = {
-    enabled = true
+    enabled = local.s3_config.data_repository.versioning_enabled
   }
   
   # Encryption
   server_side_encryption_configuration = {
     rule = {
       apply_server_side_encryption_by_default = {
-        sse_algorithm = "AES256"
+        sse_algorithm = local.s3_config.data_repository.encryption_algorithm
       }
     }
   }
   
   # Lifecycle rules
-  lifecycle_rule = [
-    {
-      id      = "transition_to_ia"
-      enabled = true
-      transition = [
-        {
-          days          = 30
-          storage_class = "STANDARD_IA"
-        }
-      ]
-    }
-  ]
+  lifecycle_rule = local.s3_config.data_repository.lifecycle_rules
   
   # Intelligent tiering
-  intelligent_tiering = {
-    enabled = true
-  }
+  intelligent_tiering = local.s3_config.data_repository.intelligent_tiering
   
   # Tags
-  tags = {
+  tags = merge(local.common_tags, {
     Name = "hpc-${local.environment}-data-repository"
     Type = "S3-Bucket"
     Purpose = "Data-Repository"
-    Environment = local.environment
-    Region = local.region
-  }
+  })
 }

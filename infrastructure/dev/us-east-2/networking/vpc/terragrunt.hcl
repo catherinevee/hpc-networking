@@ -18,19 +18,19 @@ terraform {
 inputs = {
   # VPC Module inputs
   name = "hpc-${local.environment}-vpc"
-  cidr = local.networking.vpc_cidr
+  cidr = local.vpc_config.cidr_block
   
   azs             = local.availability_zones
-  private_subnets = local.networking.subnet_cidrs.private
-  public_subnets  = local.networking.subnet_cidrs.public
+  private_subnets = local.subnet_config.private.cidr_blocks
+  public_subnets  = local.subnet_config.public.cidr_blocks
   
   # Additional subnets for HPC
-  database_subnets = local.networking.subnet_cidrs.storage
-  compute_subnets  = local.networking.subnet_cidrs.compute
+  database_subnets = local.subnet_config.storage.cidr_blocks
+  compute_subnets  = local.subnet_config.compute.cidr_blocks
   
   # Enable DNS
-  enable_dns_hostnames = true
-  enable_dns_support   = true
+  enable_dns_hostnames = local.vpc_config.enable_dns_hostnames
+  enable_dns_support   = local.vpc_config.enable_dns_support
   
   # Enable NAT Gateway (single for dev)
   enable_nat_gateway = true
@@ -46,49 +46,36 @@ inputs = {
   enable_s3_endpoint = true
   
   # Tags
-  tags = {
+  tags = merge(local.common_tags, {
     Name = "hpc-${local.environment}-vpc"
     Type = "VPC"
-    Environment = local.environment
-    Region = local.region
-  }
+  })
   
   # Subnet tags
-  private_subnet_tags = {
+  private_subnet_tags = merge(local.common_tags, {
     Type = "Private-Subnet"
     Tier = "Compute"
-    Environment = local.environment
-    Region = local.region
-  }
+  })
   
-  public_subnet_tags = {
+  public_subnet_tags = merge(local.common_tags, {
     Type = "Public-Subnet"
     Tier = "Management"
-    Environment = local.environment
-    Region = local.region
-  }
+  })
   
-  database_subnet_tags = {
+  database_subnet_tags = merge(local.common_tags, {
     Type = "Database-Subnet"
     Tier = "Storage"
-    Environment = local.environment
-    Region = local.region
-  }
+  })
   
-  compute_subnet_tags = {
+  compute_subnet_tags = merge(local.common_tags, {
     Type = "Compute-Subnet"
     Tier = "HPC-Compute"
-    Environment = local.environment
-    Region = local.region
-  }
+  })
   
   # Additional variables for local Terraform resources
   environment = local.environment
   region      = local.region
-  vpc_cidr    = local.networking.vpc_cidr
-  common_tags = {
-    Environment = local.environment
-    Region = local.region
-  }
+  vpc_cidr    = local.vpc_config.cidr_block
+  common_tags = local.common_tags
 }
 

@@ -23,14 +23,9 @@ dependency "kms" {
 inputs = {
   # CloudWatch Log Groups
   log_groups = {
-    hpc_system_logs = {
-      name              = "/aws/hpc/${local.environment}/system"
-      retention_in_days = local.monitoring.cloudwatch.log_retention_days
-      kms_key_id        = dependency.kms.outputs.kms_key_arn
-    }
-    hpc_application_logs = {
-      name              = "/aws/hpc/${local.environment}/application"
-      retention_in_days = local.monitoring.cloudwatch.log_retention_days
+    for name, config in local.cloudwatch_config.log_groups : name => {
+      name              = config.name
+      retention_in_days = config.retention_in_days
       kms_key_id        = dependency.kms.outputs.kms_key_arn
     }
   }
@@ -38,27 +33,25 @@ inputs = {
   # CloudWatch Alarms
   alarms = {
     high_queue_depth = {
-      alarm_name          = "hpc-${local.environment}-high-queue-depth"
-      comparison_operator = "GreaterThanThreshold"
-      evaluation_periods  = "2"
-      metric_name         = "JobsQueued"
-      namespace           = "AWS/ParallelCluster"
-      period              = "300"
-      statistic           = "Average"
-      threshold           = "100"
-      alarm_description   = "This metric monitors high queue depth"
+      alarm_name          = local.cloudwatch_config.alarms.high_queue_depth.alarm_name
+      comparison_operator = local.cloudwatch_config.alarms.high_queue_depth.comparison_operator
+      evaluation_periods  = local.cloudwatch_config.alarms.high_queue_depth.evaluation_periods
+      metric_name         = local.cloudwatch_config.alarms.high_queue_depth.metric_name
+      namespace           = local.cloudwatch_config.alarms.high_queue_depth.namespace
+      period              = local.cloudwatch_config.alarms.high_queue_depth.period
+      statistic           = local.cloudwatch_config.alarms.high_queue_depth.statistic
+      threshold           = local.cloudwatch_config.alarms.high_queue_depth.threshold
+      alarm_description   = local.cloudwatch_config.alarms.high_queue_depth.alarm_description
       alarm_actions       = [dependency.kms.outputs.sns_topic_arn]
       ok_actions          = [dependency.kms.outputs.sns_topic_arn]
-      treat_missing_data  = "notBreaching"
+      treat_missing_data  = local.cloudwatch_config.alarms.high_queue_depth.treat_missing_data
     }
   }
   
   # Tags
-  tags = {
+  tags = merge(local.common_tags, {
     Name = "hpc-${local.environment}-cloudwatch"
     Type = "CloudWatch"
     Purpose = "Monitoring"
-    Environment = local.environment
-    Region = local.region
-  }
+  })
 }

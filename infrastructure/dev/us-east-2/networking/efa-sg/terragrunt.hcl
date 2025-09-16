@@ -23,14 +23,14 @@ dependency "vpc" {
 inputs = {
   cluster_name = "hpc-${local.environment}"
   vpc_id       = dependency.vpc.outputs.vpc_id
-  vpc_cidr     = local.networking.vpc_cidr
+  vpc_cidr     = local.vpc_config.cidr_block
   subnet_id    = dependency.vpc.outputs.compute_subnets[0]
   availability_zone = local.networking.primary_az
   
   # EFA Configuration
-  efa_device = "efa0"
-  mtu_size   = 9000
-  enable_gpudirect = false  # Disabled for dev
+  efa_device = local.efa_config.device_name
+  mtu_size   = local.efa_config.mtu_size
+  enable_gpudirect = local.efa_config.enable_gpudirect
   
   # Instance Configuration
   instance_type = local.instance_types.compute
@@ -69,18 +69,13 @@ inputs = {
   ok_actions    = [aws_sns_topic.hpc_alerts.arn]
   
   # Tags
-  tags = {
+  tags = merge(local.common_tags, {
     Component = "EFA-Network"
     Tier      = "HPC-Compute"
-    Environment = local.environment
-    Region = local.region
-  }
+  })
   
   # Additional variables for local Terraform resources
   environment = local.environment
   region      = local.region
-  common_tags = {
-    Environment = local.environment
-    Region = local.region
-  }
+  common_tags = local.common_tags
 }

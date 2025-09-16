@@ -79,24 +79,19 @@ inputs = {
   
   # EFA Configuration
   efa = {
-    enabled = true
-    gdr_support = false  # Disabled for dev
+    enabled = local.efa_config.enabled
+    gdr_support = local.efa_config.enable_gpudirect
   }
   
   # Tags
-  tags = {
+  tags = merge(local.common_tags, {
     Name = local.cluster_name
     Type = "ParallelCluster"
     Purpose = "HPC-Compute"
-    Environment = local.environment
-    Region = local.region
-  }
+  })
   
   # Additional variables for local Terraform resources
   environment = local.environment
   region      = local.region
-  common_tags = {
-    Environment = local.environment
-    Region = local.region
-  }
+  common_tags = local.common_tags
 }
