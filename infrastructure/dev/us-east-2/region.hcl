@@ -79,6 +79,8 @@ locals {
       "r5n.12xlarge",
       "r5n.24xlarge"
     ]
+    enable_savings_plans = false
+    enable_reserved_instances = false
   }
   
   # Region-specific networking
@@ -328,10 +330,4 @@ locals {
     enable_config = false
   }
   
-  # Dev-specific cost optimization
-  cost_optimization = {
-    spot_percentage = 90      # Higher spot usage
-    enable_savings_plans = false
-    enable_reserved_instances = false
-  }
 }
