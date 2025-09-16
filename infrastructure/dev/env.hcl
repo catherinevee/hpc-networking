@@ -57,6 +57,9 @@ locals {
   # EFA configuration
   efa_config = {
     enabled = true
+    device_name = "efa0"
+    mtu_size = 9000
+    enable_gpudirect = false
     instance_types = local.instance_types.spot_types
     security_group_rules = {
       efa_ports = {
@@ -444,6 +447,68 @@ locals {
     }
   }
   
+  # Storage Configuration
+  storage = {
+    s3 = {
+      data_repository_bucket = "hpc-${local.environment}-${local.region}-data-repository"
+      versioning_enabled = true
+      encryption_algorithm = "AES256"
+      lifecycle_rules = [
+        {
+          id = "archive-old-versions"
+          enabled = true
+          noncurrent_version_transitions = [
+            {
+              days          = 30
+              storage_class = "STANDARD_IA"
+            },
+            {
+              days          = 60
+              storage_class = "GLACIER"
+            },
+          ]
+          noncurrent_version_expiration = {
+            days = 365
+          }
+        }
+      ]
+      intelligent_tiering = false
+    }
+  }
+
+  # Monitoring Configuration
+  monitoring = {
+    cloudwatch = {
+      log_retention_days = 7
+      detailed_monitoring = false
+      enable_grafana = false
+      log_groups = {
+        parallel_cluster = {
+          name = "/aws/parallelcluster/${local.cluster_name}"
+          retention_in_days = 7
+        }
+        vpc_flow_logs = {
+          name = "/aws/vpc/flow-logs/${local.cluster_name}"
+          retention_in_days = 7
+        }
+      }
+      alarms = {
+        high_queue_depth = {
+          alarm_name = "${local.cluster_name}-HighQueueDepth"
+          comparison_operator = "GreaterThanThreshold"
+          evaluation_periods = 2
+          metric_name = "QueueDepth"
+          namespace = "AWS/SQS"
+          period = 300
+          statistic = "Average"
+          threshold = 100
+          alarm_description = "Alarm when SQS queue depth is high"
+          treat_missing_data = "notBreaching"
+        }
+      }
+    }
+  }
+
   # Dev-specific overrides
   cluster_capacity = 100
   cloudwatch_log_retention_days = 7
