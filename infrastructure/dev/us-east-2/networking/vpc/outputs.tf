@@ -1,40 +1,44 @@
-# VPC outputs
 output "vpc_id" {
   description = "ID of the VPC"
-  value       = module.vpc.vpc_id
+  value       = aws_vpc.main.id
 }
 
 output "vpc_cidr_block" {
   description = "CIDR block of the VPC"
-  value       = module.vpc.vpc_cidr_block
-}
-
-output "private_subnets" {
-  description = "List of IDs of private subnets"
-  value       = module.vpc.private_subnets
+  value       = aws_vpc.main.cidr_block
 }
 
 output "public_subnets" {
-  description = "List of IDs of public subnets"
-  value       = module.vpc.public_subnets
+  description = "IDs of the public subnets"
+  value       = aws_subnet.public[*].id
+}
+
+output "private_subnets" {
+  description = "IDs of the private subnets"
+  value       = aws_subnet.private[*].id
 }
 
 output "database_subnets" {
-  description = "List of IDs of database subnets"
-  value       = module.vpc.database_subnets
+  description = "IDs of the database subnets"
+  value       = aws_subnet.database[*].id
 }
 
 output "compute_subnets" {
-  description = "List of IDs of compute subnets"
-  value       = module.vpc.compute_subnets
+  description = "IDs of the compute subnets"
+  value       = aws_subnet.compute[*].id
+}
+
+output "internet_gateway_id" {
+  description = "ID of the Internet Gateway"
+  value       = aws_internet_gateway.main.id
 }
 
 output "nat_gateway_ids" {
-  description = "List of IDs of the NAT Gateways"
-  value       = module.vpc.natgw_ids
+  description = "IDs of the NAT Gateways"
+  value       = aws_nat_gateway.main[*].id
 }
 
 output "vpc_endpoints_security_group_id" {
-  description = "ID of the VPC endpoints security group"
+  description = "ID of the security group for VPC endpoints"
   value       = aws_security_group.vpc_endpoints.id
 }

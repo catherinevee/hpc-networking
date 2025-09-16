@@ -9,11 +9,11 @@ include "region" {
 }
 
 terraform {
-  source = "git::https://github.com/terraform-aws-modules/terraform-aws-vpc.git?ref=v5.1.2"
+  source = "."
 }
 
 inputs = {
-  # VPC Module inputs
+  # VPC Configuration
   name = "hpc-dev-vpc"
   cidr = "10.0.0.0/16"
   
@@ -25,19 +25,8 @@ inputs = {
   database_subnets = ["10.0.200.0/24", "10.0.201.0/24", "10.0.202.0/24"]
   compute_subnets  = ["10.0.100.0/22", "10.0.104.0/22", "10.0.108.0/22"]
 
-  # Enable DNS
-  enable_dns_hostnames = true
-  enable_dns_support   = true
-  
   # Enable NAT Gateway (single for dev)
   enable_nat_gateway = true
-  single_nat_gateway = true  # Cost optimization for dev
-  
-  # Disable VPC Flow Logs for now to simplify configuration
-  enable_flow_log = false
-  
-  # VPC Endpoints for AWS services
-  enable_s3_endpoint = true
   
   # Tags
   tags = {
@@ -89,18 +78,6 @@ inputs = {
     Owner = "DevOps-Team"
     Type = "Compute-Subnet"
     Tier = "HPC-Compute"
-  }
-  
-  # Additional variables for local Terraform resources
-  environment = "dev"
-  region      = "us-east-2"
-  vpc_cidr    = "10.0.0.0/16"
-  common_tags = {
-    Environment = "dev"
-    Region = "us-east-2"
-    Project = "HPC-Networking"
-    ManagedBy = "Terragrunt"
-    Owner = "DevOps-Team"
   }
 }
 
