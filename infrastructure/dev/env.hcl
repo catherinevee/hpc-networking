@@ -1,7 +1,4 @@
 # Dev Environment Configuration
-include "account" {
-  path = find_in_parent_folders("account.hcl")
-}
 
 # Consolidated Configuration for Dev Environment
 locals {

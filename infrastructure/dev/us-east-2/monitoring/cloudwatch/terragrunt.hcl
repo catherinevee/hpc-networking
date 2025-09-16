@@ -1,4 +1,8 @@
 # CloudWatch Monitoring for Dev Environment
+include "account" {
+  path = find_in_parent_folders("account.hcl")
+}
+
 include "env" {
   path = "../../../env.hcl"
 }
