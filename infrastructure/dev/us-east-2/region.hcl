@@ -1,6 +1,7 @@
 # US East 2 Region Configuration for Dev Environment
 
 locals {
+  environment = "dev"
   region = "us-east-2"
   
   # Region-specific availability zones
