@@ -38,6 +38,7 @@ inputs = {
   create_flow_log_cloudwatch_log_group = true
   create_flow_log_cloudwatch_iam_role  = true
   flow_log_max_aggregation_interval    = 60
+  flow_log_cloudwatch_log_group_name_suffix = "vpc-flow-logs"
   
   # VPC Endpoints for AWS services
   enable_s3_endpoint = true
