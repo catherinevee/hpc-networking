@@ -15,10 +15,12 @@ terraform {
 # Dependencies
 dependency "vpc" {
   config_path = "../../networking/vpc"
+  skip_outputs = true
 }
 
 dependency "s3_bucket" {
   config_path = "../s3-data-repository"
+  skip_outputs = true
 }
 
 inputs = {
@@ -43,11 +45,11 @@ inputs = {
   weekly_maintenance_start_time = local.fsx_lustre_config.scratch.weekly_maintenance_start_time
   
   # Network Configuration
-  subnet_ids         = dependency.vpc.outputs.database_subnets
-  security_group_ids = [dependency.vpc.outputs.vpc_endpoints_security_group_id]
-  
+  subnet_ids         = ["subnet-placeholder"]  # Will be replaced when VPC is applied
+  security_group_ids = ["sg-placeholder"]  # Will be replaced when VPC is applied
+
   # S3 Data Repository
-  data_repository_path = "s3://${dependency.s3_bucket.outputs.s3_bucket_id}/scratch"
+  data_repository_path = "s3://hpc-dev-data-repository/scratch"  # Will be replaced when S3 is applied
   
   # Tags
   tags = merge(local.common_tags, local.fsx_lustre_config.scratch.tags, {

@@ -15,18 +15,22 @@ terraform {
 # Dependencies
 dependency "vpc" {
   config_path = "../../networking/vpc"
+  skip_outputs = true
 }
 
 dependency "efa_sg" {
   config_path = "../../networking/efa-sg"
+  skip_outputs = true
 }
 
 dependency "fsx_scratch" {
   config_path = "../../storage/fsx-lustre-scratch"
+  skip_outputs = true
 }
 
 dependency "fsx_persistent" {
   config_path = "../../storage/fsx-lustre-persistent"
+  skip_outputs = true
 }
 
 inputs = {
@@ -34,24 +38,24 @@ inputs = {
   cluster_name = local.cluster_name
   
   # VPC Configuration
-  vpc_id = dependency.vpc.outputs.vpc_id
-  subnet_id = dependency.vpc.outputs.compute_subnets[0]
-  
+  vpc_id = "vpc-placeholder"  # Will be replaced when VPC is applied
+  subnet_id = "subnet-placeholder"  # Will be replaced when VPC is applied
+
   # Security Groups
-  additional_security_groups = [dependency.efa_sg.outputs.security_group_id]
-  
+  additional_security_groups = ["sg-placeholder"]  # Will be replaced when EFA-SG is applied
+
   # Storage Configuration
   shared_storage = {
     fsx_lustre = [
       {
         name = "scratch"
         mount_dir = "/scratch"
-        fsx_fs_id = dependency.fsx_scratch.outputs.fsx_lustre_file_system_id
+        fsx_fs_id = "fsx-placeholder"  # Will be replaced when FSx is applied
       },
       {
         name = "persistent"
         mount_dir = "/persistent"
-        fsx_fs_id = dependency.fsx_persistent.outputs.fsx_lustre_file_system_id
+        fsx_fs_id = "fsx-placeholder"  # Will be replaced when FSx is applied
       }
     ]
   }

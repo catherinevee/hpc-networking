@@ -15,6 +15,7 @@ terraform {
 # Dependencies
 dependency "kms" {
   config_path = "../../networking/efa-sg"
+  skip_outputs = true
 }
 
 inputs = {

@@ -15,14 +15,15 @@ terraform {
 # Get VPC information from the VPC module
 dependency "vpc" {
   config_path = "../vpc"
+  skip_outputs = true
 }
 
 inputs = {
-  cluster_name = "hpc-${local.environment}"
-  vpc_id       = dependency.vpc.outputs.vpc_id
-  vpc_cidr     = local.vpc_config.cidr_block
-  subnet_id    = dependency.vpc.outputs.compute_subnets[0]
-  availability_zone = local.networking.primary_az
+  cluster_name = "hpc-dev"
+  vpc_id       = "vpc-placeholder"  # Will be replaced when VPC is applied
+  vpc_cidr     = "10.0.0.0/16"
+  subnet_id    = "subnet-placeholder"  # Will be replaced when VPC is applied
+  availability_zone = "us-east-2a"
   
   # EFA Configuration
   efa_device = local.efa_config.device_name
