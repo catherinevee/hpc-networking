@@ -2,7 +2,7 @@
 # Simplified configuration with hardcoded values to avoid locals loading issues
 
 terraform {
-  source = "git::https://github.com/terraform-aws-modules/terraform-aws-fsx-lustre.git?ref=v1.0.0"
+  source = "../../../../modules/fsx-lustre"
 }
 
 # Dependencies

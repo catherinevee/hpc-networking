@@ -2,7 +2,7 @@
 # Simplified configuration with hardcoded values to avoid locals loading issues
 
 terraform {
-  source = "git::https://github.com/terraform-aws-modules/terraform-aws-s3-bucket.git?ref=v4.1.2"
+  source = "../../../../modules/s3-bucket"
 }
 
 # Dependencies
