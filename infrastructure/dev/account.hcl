@@ -1,7 +1,7 @@
 # Dev Environment Account Configuration
 locals {
   environment = "dev"
-  account_id  = get_aws_account_id()
+  account_id  = "025066254478"  # Hardcoded for validation phase
   region      = "us-east-2"
   
   # Dev-specific configurations
