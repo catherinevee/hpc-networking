@@ -60,8 +60,8 @@ locals {
     
     # S3 configuration
     s3 = {
-      data_repository_bucket = "hpc-data-repository-dev-${random_id.bucket_suffix.hex}"
-      flow_logs_bucket = "hpc-vpc-flow-logs-dev-${random_id.bucket_suffix.hex}"
+      data_repository_bucket = "hpc-data-repository-dev-${local.environment}-${local.region}"
+      flow_logs_bucket = "hpc-vpc-flow-logs-dev-${local.environment}-${local.region}"
     }
   }
   
