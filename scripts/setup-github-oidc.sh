@@ -4,7 +4,7 @@
 set -euo pipefail
 
 # Configuration
-GITHUB_ORG="your-github-org"
+GITHUB_ORG="catherinevee"
 GITHUB_REPO="hpc-networking"
 AWS_REGION="us-east-2"
 ROLE_NAME="GitHubActions-HPC-Networking-Role"

@@ -13,24 +13,17 @@ dependency "kms" {
 
 inputs = {
   # Bucket Configuration - Hardcoded for dev environment
-  bucket = "hpc-dev-us-east-2-data-repository"
+  bucket_name = "hpc-dev-us-east-2-data-repository"
   
   # Versioning
-  versioning = {
-    enabled = true
-  }
+  versioning_enabled = true
   
   # Encryption
-  server_side_encryption_configuration = {
-    rule = {
-      apply_server_side_encryption_by_default = {
-        sse_algorithm = "AES256"
-      }
-    }
-  }
+  encryption_enabled = true
+  encryption_algorithm = "AES256"
   
   # Lifecycle rules - Hardcoded for dev environment
-  lifecycle_rule = [
+  lifecycle_rules = [
     {
       id = "archive-old-versions"
       enabled = true
@@ -49,9 +42,6 @@ inputs = {
       }
     }
   ]
-  
-  # Intelligent tiering - Disabled for dev
-  intelligent_tiering = false
   
   # Tags - Hardcoded for dev environment
   tags = {
