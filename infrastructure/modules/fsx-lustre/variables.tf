@@ -103,6 +103,12 @@ variable "create_mount_target" {
   default     = false
 }
 
+variable "common_tags" {
+  description = "A map of common tags to assign to the file system"
+  type        = map(string)
+  default     = {}
+}
+
 variable "tags" {
   description = "A map of tags to assign to the file system"
   type        = map(string)

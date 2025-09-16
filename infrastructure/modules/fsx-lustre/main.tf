@@ -29,29 +29,20 @@ resource "aws_fsx_lustre_file_system" "main" {
   subnet_ids         = var.subnet_ids
   security_group_ids = var.security_group_ids
 
-  # Data repository association
-  dynamic "data_repository_association" {
-    for_each = var.data_repository_path != null ? [1] : []
-    content {
-      data_repository_path = var.data_repository_path
-      file_system_path     = var.file_system_path
-    }
-  }
-
-  tags = merge(var.tags, {
+  tags = merge(var.common_tags, var.tags, {
     Name = var.name
   })
 }
 
-# Mount target for the file system
-resource "aws_fsx_lustre_file_system" "mount_target" {
-  count = var.create_mount_target ? 1 : 0
+# Data repository association
+resource "aws_fsx_data_repository_association" "main" {
+  count = var.data_repository_path != null ? 1 : 0
 
-  file_system_id = aws_fsx_lustre_file_system.main.id
-  subnet_id      = var.subnet_ids[0]
-  security_groups = var.security_group_ids
+  file_system_id       = aws_fsx_lustre_file_system.main.id
+  data_repository_path = var.data_repository_path
+  file_system_path     = var.file_system_path
 
-  tags = merge(var.tags, {
-    Name = "${var.name}-mount-target"
+  tags = merge(var.common_tags, var.tags, {
+    Name = "${var.name}-data-repo"
   })
 }

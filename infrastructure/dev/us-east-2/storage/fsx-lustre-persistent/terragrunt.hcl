@@ -21,7 +21,7 @@ inputs = {
   name = "hpc-dev-persistent"
   
   # Storage Configuration - Hardcoded for dev environment
-  storage_capacity = 10  # 10TB for dev
+  storage_capacity = 10240  # 10TB = 10240 GiB for dev
   storage_type     = "SSD"
   deployment_type  = "PERSISTENT_1"
   per_unit_storage_throughput = 1000  # MB/s per TiB
@@ -44,13 +44,17 @@ inputs = {
   # S3 Data Repository
   data_repository_path = "s3://hpc-dev-us-east-2-data-repository/persistent"  # Will be replaced when S3 is applied
   
-  # Tags - Hardcoded for dev environment
-  tags = {
+  # Common tags
+  common_tags = {
     Environment = "dev"
     Region = "us-east-2"
     Project = "HPC-Networking"
     ManagedBy = "Terragrunt"
     Owner = "DevOps-Team"
+  }
+  
+  # Tags - Hardcoded for dev environment
+  tags = {
     Purpose = "Persistent-Storage"
     DataLifecycle = "Long-term"
     Name = "hpc-dev-persistent"

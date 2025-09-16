@@ -21,7 +21,7 @@ inputs = {
   name = "hpc-dev-scratch"
   
   # Storage Configuration - Hardcoded for dev environment
-  storage_capacity = 50  # 50TB for dev
+  storage_capacity = 51200  # 50TB = 51200 GiB for dev
   storage_type     = "SSD"
   deployment_type  = "PERSISTENT_1"
   per_unit_storage_throughput = 200  # MB/s per TiB
@@ -44,13 +44,17 @@ inputs = {
   # S3 Data Repository
   data_repository_path = "s3://hpc-dev-us-east-2-data-repository/scratch"  # Will be replaced when S3 is applied
   
-  # Tags - Hardcoded for dev environment
-  tags = {
+  # Common tags
+  common_tags = {
     Environment = "dev"
     Region = "us-east-2"
     Project = "HPC-Networking"
     ManagedBy = "Terragrunt"
     Owner = "DevOps-Team"
+  }
+  
+  # Tags - Hardcoded for dev environment
+  tags = {
     Purpose = "Scratch-Storage"
     DataLifecycle = "Temporary"
     Name = "hpc-dev-scratch"
