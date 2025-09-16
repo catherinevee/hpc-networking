@@ -2,7 +2,7 @@
 # Simplified configuration with hardcoded values to avoid locals loading issues
 
 terraform {
-  source = "../../../modules/efa-network"
+  source = "../../../../modules/efa-network"
 }
 
 # Get VPC information from the VPC module
